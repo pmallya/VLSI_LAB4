@@ -15,6 +15,5 @@ always @(A)
  A[1]: Y = 8'd2;
  A[0]: Y = 8'd1;
  default: Y = 8'd0; // Don?t care when input is all 0?s
- //default: Y = 8'bxxxxxxxx; // Don?t care when input is all 0?s
  endcase
 endmodule
