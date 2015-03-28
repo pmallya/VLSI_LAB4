@@ -5,7 +5,7 @@ input logic [wordLen-1:0] A,
 output logic [wordLen -1:0] Y
 );							  
 	
-	logic X1_1, X2_1, X3_1, X4_1, X5_1, X6_1;
+	logic X1_7, X2_7, X3_7, X4_7, X5_7, X6_7;
 	
 	assign X6_7 = ~A[7] & ~A[6];
 	assign X5_7 = X6_7 & ~A[5];
