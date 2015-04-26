@@ -1,4 +1,4 @@
-module FIFO 
+ module FIFO 
 	#(parameter int wL = 8,
 	  parameter int d = 8 ) 
 	
