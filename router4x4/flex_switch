@@ -1,0 +1,158 @@
+module flexswitch
+#(
+parameter int wL = 16,
+parameter int lhsCount = 5,
+parameter int rhsCount = 5,
+parameter int srcAddr  = 2,
+parameter int wLen = 1
+)(
+input logic [wL-1:0] data_left[lhsCount-1:0],
+input logic [srcAddr-1:0] data_right_src_addr[rhsCount-1:0],
+input logic rst,
+input logic clk,
+input logic [lhsCount-1:0] en ,
+output logic [wL-1:0] data_right[rhsCount-1:0],
+);	
+
+
+logic [wL-1:0] data_left_internal[lhsCount-1:0];
+logic [srcAddr-1:0] data_right_src_addr_internal[rhsCount-1:0];
+logic [wL-1:0] data_right_internal[rhsCount-1:0];
+logic [lhsCount-1:0] en_internal ;
+logic [wL-1:0] data_left_internal_N[3:0];
+logic [wL-1:0] data_left_internal_E[3:0];
+logic [wL-1:0] data_left_internal_S[3:0];
+logic [wL-1:0] data_left_internal_W[3:0];
+logic [wL-1:0] data_left_internal_L[3:0];
+
+
+always_ff @(posedge clk) begin
+      if (~rst) begin
+	     en_internal <= 5'd0;
+	  end else begin
+	     en_internal <= en;
+	  end
+end
+
+
+genvar i;
+ // made changes to put enable = 1 at the input DFF only 
+	dff_multi #(lhsCount,wL) X_dff_left (data_left, clk, rst, 5'b11111, data_left_internal);
+	dff_multi #(rhsCount,srcAddr) X_dff_sel (data_right_src_addr, clk, rst, 5'b11111, data_right_src_addr_internal);
+	dff_multi #(rhsCount,wL) X_dff_right (data_right_internal, clk, rst, en_internal, data_right);
+
+	
+	// N > E > S > W > L
+	//Leave North
+	assign data_left_internal_N[0] = data_left_internal[1]; // E
+	assign data_left_internal_N[1] = data_left_internal[2]; // S
+	assign data_left_internal_N[2] = data_left_internal[3]; // W
+	assign data_left_internal_N[3] = data_left_internal[4]; // L 
+	
+	// Leave East	
+	assign data_left_internal_E[0] = data_left_internal[0]; // N
+	assign data_left_internal_E[1] = data_left_internal[2]; // S
+	assign data_left_internal_E[2] = data_left_internal[3]; // W
+	assign data_left_internal_E[3] = data_left_internal[4]; // L
+	
+	// Leave South	
+	assign data_left_internal_S[0] = data_left_internal[0]; // N
+	assign data_left_internal_S[1] = data_left_internal[1]; // E
+	assign data_left_internal_S[2] = data_left_internal[3]; // W
+	assign data_left_internal_S[3] = data_left_internal[4]; // L
+	
+	// Leave West
+	assign data_left_internal_W[0] = data_left_internal[0]; // N
+	assign data_left_internal_W[1] = data_left_internal[1]; // E
+	assign data_left_internal_W[2] = data_left_internal[2]; // S
+	assign data_left_internal_W[3] = data_left_internal[4]; // L
+	
+	// Leave Local
+	assign data_left_internal_L[0] = data_left_internal[0]; // N
+	assign data_left_internal_L[1] = data_left_internal[1]; // E
+	assign data_left_internal_L[2] = data_left_internal[2]; // S
+	assign data_left_internal_L[3] = data_left_internal[3]; // W
+
+	//generate
+	//	for( i = 0 ; i < rhsCount ; i = i+1) begin: loop_rhs	
+			mux4 #(wL) X_mux_N (data_right_internal[0], data_left_internal_N, data_right_src_addr_internal[0]);
+			mux4 #(wL) X_mux_E (data_right_internal[1], data_left_internal_E, data_right_src_addr_internal[1]);
+			mux4 #(wL) X_mux_S (data_right_internal[2], data_left_internal_S, data_right_src_addr_internal[2]);
+			mux4 #(wL) X_mux_W (data_right_internal[3], data_left_internal_W, data_right_src_addr_internal[3]);
+			mux4 #(wL) X_mux_L (data_right_internal[4], data_left_internal_L, data_right_src_addr_internal[4]);
+	//	end
+	//endgenerate
+
+
+endmodule //flexSwitch
+
+module dff_multi
+#(parameter  size = 1, 
+  parameter  wordLen = 1
+  )(
+  input  [wordLen-1:0] din_multi[size-1:0], 
+  input  clk, 
+  input  rst, 
+// input  [wordLen-1:0] rst_val[size-1:0],
+  input   [size-1:0] en , 
+  output  [wordLen-1:0] q[size-1:0]
+);
+
+genvar i ;
+ 
+	generate
+    	for( i = 0 ; i < size ; i= i+1 ) begin: loop_c 
+        	dff_single #( wordLen ) dnnn( din_multi[i] , clk, rst, en[i], q[i] );
+        end 
+	endgenerate 
+
+endmodule //dff_multi
+
+module dff_single #(parameter int wordLen = 1 )
+(
+ input logic [wordLen-1:0] din,
+ input logic clk,
+ input logic rst,
+// input logic [wordLen-1:0] rst_val,
+ input logic en,
+ output logic [wordLen-1:0] q
+);
+ 	 
+logic [wordLen-1:0] d ;
+bit [wordLen-1:0] q_val; //FlipFlop State
+                 
+    assign d[wordLen-1:0] = din[wordLen-1:0]; //Delay data in to prevent inf. loops
+    assign q = q_val ;
+ 
+    always @ (posedge clk) begin //Flops CLK
+//    	assert ( ~$isunknown(d) || ~rst ) else $error("Error:d is X or Z") ; //Do Not Flop an X
+ 
+    	priority case ( 1'b1 )
+    		(~rst): q_val[wordLen-1:0] <= 0 ; //Reset is active low
+        	( en): q_val[wordLen-1:0] <= d[wordLen-1:0] ; //Enable is active high
+        	(~en): q_val[wordLen-1:0] <= q[wordLen-1:0] ; //Enable is active high
+			default:  q_val[wordLen-1:0] <= q[wordLen-1:0];
+    	endcase //end priority case
+    end //end always_ff
+ 
+endmodule //dff
+
+module mux4
+ #( /*parameter int unsigned noOfInputs = 4,*/
+ parameter int wordLen = 16 
+ )( 
+ output logic [wordLen-1:0] out,
+ input logic [wordLen-1:0] in[3:0], 
+ input logic [1:0] sel
+);
+		
+ always_comb	begin
+    priority case(sel) 
+		2'd0:  out = in[0];
+		2'd1:  out = in[1];
+		2'd2:  out = in[2];
+		2'd3:  out = in[3];
+		//default: out = 16'd0;
+		endcase
+    end
+endmodule //mux4
